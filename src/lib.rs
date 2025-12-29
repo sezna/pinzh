@@ -5,38 +5,107 @@
 
 use std::collections::HashMap;
 
-/// Represents the different tone marks in Zhuyin
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ZhuyinTone {
-    Tone1, // ˉ (usually omitted in Zhuyin)
-    Tone2, // ˊ
-    Tone3, // ˇ
-    Tone4, // ˋ
-    Tone5, // · (light tone, usually omitted)
+/// Represents the different tones in Chinese phonetics
+///
+/// The five tones can be displayed as either Zhuyin tone marks or numeric values (1-5).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Tone {
+    /// First tone (high level) - usually unmarked in Zhuyin
+    Tone1,
+    /// Second tone (rising) - ˊ
+    Tone2,
+    /// Third tone (dipping) - ˇ
+    Tone3,
+    /// Fourth tone (falling) - ˋ
+    Tone4,
+    /// Fifth tone (neutral/light) - ˙ (placed before syllable)
+    Tone5,
 }
 
-impl ZhuyinTone {
-    /// Convert a numeric tone (1-5) to a ZhuyinTone enum
+/// Backwards-compatible type alias
+#[deprecated(since = "0.2.0", note = "Use `Tone` instead")]
+pub type ZhuyinTone = Tone;
+
+impl Tone {
+    /// Convert a numeric tone (1-5) to a Tone enum
+    ///
+    /// # Example
+    /// ```
+    /// use pinzh::Tone;
+    /// assert_eq!(Tone::from_number(3), Some(Tone::Tone3));
+    /// assert_eq!(Tone::from_number(6), None);
+    /// ```
     pub fn from_number(n: u8) -> Option<Self> {
         match n {
-            1 => Some(ZhuyinTone::Tone1),
-            2 => Some(ZhuyinTone::Tone2),
-            3 => Some(ZhuyinTone::Tone3),
-            4 => Some(ZhuyinTone::Tone4),
-            5 => Some(ZhuyinTone::Tone5),
+            1 => Some(Tone::Tone1),
+            2 => Some(Tone::Tone2),
+            3 => Some(Tone::Tone3),
+            4 => Some(Tone::Tone4),
+            5 => Some(Tone::Tone5),
+            _ => None,
+        }
+    }
+
+    /// Convert a Zhuyin tone mark to a Tone enum
+    ///
+    /// # Example
+    /// ```
+    /// use pinzh::Tone;
+    /// assert_eq!(Tone::from_mark("ˇ"), Some(Tone::Tone3));
+    /// assert_eq!(Tone::from_mark("x"), None);
+    /// ```
+    pub fn from_mark(s: &str) -> Option<Self> {
+        match s {
+            "ˊ" => Some(Tone::Tone2),
+            "ˇ" => Some(Tone::Tone3),
+            "ˋ" => Some(Tone::Tone4),
+            "˙" => Some(Tone::Tone5),
+            "" => Some(Tone::Tone1),
             _ => None,
         }
     }
 
     /// Get the Zhuyin tone mark as a string
+    ///
+    /// Note: Tone1 returns an empty string as it is typically unmarked in Zhuyin.
+    ///
+    /// # Example
+    /// ```
+    /// use pinzh::Tone;
+    /// assert_eq!(Tone::Tone3.to_mark(), "ˇ");
+    /// assert_eq!(Tone::Tone1.to_mark(), "");
+    /// ```
     pub fn to_mark(&self) -> &str {
         match self {
-            ZhuyinTone::Tone1 => "", // First tone is usually unmarked
-            ZhuyinTone::Tone2 => "ˊ",
-            ZhuyinTone::Tone3 => "ˇ",
-            ZhuyinTone::Tone4 => "ˋ",
-            ZhuyinTone::Tone5 => "˙", // Light tone (placed before the syllable)
+            Tone::Tone1 => "", // First tone is usually unmarked
+            Tone::Tone2 => "ˊ",
+            Tone::Tone3 => "ˇ",
+            Tone::Tone4 => "ˋ",
+            Tone::Tone5 => "˙", // Light tone (placed before the syllable)
         }
+    }
+
+    /// Get the numeric representation of this tone (1-5)
+    ///
+    /// # Example
+    /// ```
+    /// use pinzh::Tone;
+    /// assert_eq!(Tone::Tone3.to_number(), 3);
+    /// ```
+    pub fn to_number(&self) -> u8 {
+        match self {
+            Tone::Tone1 => 1,
+            Tone::Tone2 => 2,
+            Tone::Tone3 => 3,
+            Tone::Tone4 => 4,
+            Tone::Tone5 => 5,
+        }
+    }
+}
+
+impl std::fmt::Display for Tone {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_mark())
     }
 }
 
@@ -207,7 +276,7 @@ fn parse_pinyin_syllable(syllable: &str) -> (Option<String>, Option<String>, Opt
 /// * `pinyin` - A Pinyin syllable, optionally with a tone number (1-5) at the end
 ///
 /// # Returns
-/// A tuple containing the Zhuyin representation and optional tone mark
+/// A tuple containing the Zhuyin representation and optional tone
 ///
 /// # Example
 /// ```
@@ -215,9 +284,9 @@ fn parse_pinyin_syllable(syllable: &str) -> (Option<String>, Option<String>, Opt
 ///
 /// let (zhuyin, tone) = convert_syllable("ma3");
 /// assert_eq!(zhuyin, "ㄇㄚ");
-/// assert_eq!(tone, Some(pinzh::ZhuyinTone::Tone3));
+/// assert_eq!(tone, Some(pinzh::Tone::Tone3));
 /// ```
-pub fn convert_syllable(pinyin: &str) -> (String, Option<ZhuyinTone>) {
+pub fn convert_syllable(pinyin: &str) -> (String, Option<Tone>) {
     let initials_table = build_initials_table();
     let finals_table = build_finals_table();
 
@@ -298,7 +367,7 @@ pub fn convert_syllable(pinyin: &str) -> (String, Option<ZhuyinTone>) {
     }
 
     // Convert tone
-    let tone = tone_num.and_then(ZhuyinTone::from_number);
+    let tone = tone_num.and_then(Tone::from_number);
 
     (result, tone)
 }
@@ -322,9 +391,9 @@ pub fn to_zhuyin(pinyin: &str) -> String {
     let (zhuyin, tone) = convert_syllable(pinyin);
 
     match tone {
-        Some(ZhuyinTone::Tone5) => {
+        Some(Tone::Tone5) => {
             // Light tone mark goes before the syllable
-            format!("{}{}",  ZhuyinTone::Tone5.to_mark(), zhuyin)
+            format!("{}{}", Tone::Tone5.to_mark(), zhuyin)
         }
         Some(t) => {
             // Other tone marks go after the syllable
@@ -332,6 +401,133 @@ pub fn to_zhuyin(pinyin: &str) -> String {
         }
         None => zhuyin,
     }
+}
+
+/// Extract the tone from a Pinyin syllable without converting to Zhuyin
+///
+/// # Arguments
+/// * `pinyin` - A Pinyin syllable, optionally with a tone number (1-5) at the end
+///
+/// # Returns
+/// The tone if present, or `None` if no tone number is found
+///
+/// # Example
+/// ```
+/// use pinzh::{extract_tone, Tone};
+///
+/// assert_eq!(extract_tone("ma3"), Some(Tone::Tone3));
+/// assert_eq!(extract_tone("ni"), None);
+/// ```
+pub fn extract_tone(pinyin: &str) -> Option<Tone> {
+    let chars: Vec<char> = pinyin.chars().collect();
+    if chars.is_empty() {
+        return None;
+    }
+
+    let last = *chars.last().unwrap();
+    if last.is_ascii_digit() {
+        last.to_digit(10).and_then(|d| Tone::from_number(d as u8))
+    } else {
+        None
+    }
+}
+
+/// Extract the tone from a Zhuyin string with tone marks
+///
+/// Detects tone marks at the beginning (˙ for Tone5) or end (ˊˇˋ for Tones 2-4).
+/// If no tone mark is found, assumes Tone1 (unmarked).
+///
+/// # Arguments
+/// * `zhuyin` - A Zhuyin string, optionally with tone marks
+///
+/// # Returns
+/// The detected tone, or `Tone::Tone1` if no mark is present
+///
+/// # Example
+/// ```
+/// use pinzh::{extract_tone_from_zhuyin, Tone};
+///
+/// assert_eq!(extract_tone_from_zhuyin("ㄇㄚˇ"), Some(Tone::Tone3));
+/// assert_eq!(extract_tone_from_zhuyin("˙ㄇㄚ"), Some(Tone::Tone5));
+/// assert_eq!(extract_tone_from_zhuyin("ㄇㄚ"), Some(Tone::Tone1));
+/// ```
+pub fn extract_tone_from_zhuyin(zhuyin: &str) -> Option<Tone> {
+    if zhuyin.is_empty() {
+        return None;
+    }
+
+    // Check for leading light tone mark (Tone5)
+    if zhuyin.starts_with('˙') {
+        return Some(Tone::Tone5);
+    }
+
+    // Check for trailing tone marks
+    let last_char = zhuyin.chars().last()?;
+    match last_char {
+        'ˊ' => Some(Tone::Tone2),
+        'ˇ' => Some(Tone::Tone3),
+        'ˋ' => Some(Tone::Tone4),
+        _ => Some(Tone::Tone1), // No mark = first tone
+    }
+}
+
+/// Remove the tone number from a Pinyin syllable
+///
+/// # Arguments
+/// * `pinyin` - A Pinyin syllable, optionally with a tone number (1-5) at the end
+///
+/// # Returns
+/// The Pinyin syllable without the tone number
+///
+/// # Example
+/// ```
+/// use pinzh::strip_tone;
+///
+/// assert_eq!(strip_tone("ma3"), "ma");
+/// assert_eq!(strip_tone("ni"), "ni");
+/// ```
+pub fn strip_tone(pinyin: &str) -> String {
+    let mut chars: Vec<char> = pinyin.chars().collect();
+    if !chars.is_empty() {
+        let last = *chars.last().unwrap();
+        if last.is_ascii_digit() && ('1'..='5').contains(&last) {
+            chars.pop();
+        }
+    }
+    chars.into_iter().collect()
+}
+
+/// Remove the tone mark from a Zhuyin string
+///
+/// # Arguments
+/// * `zhuyin` - A Zhuyin string, optionally with tone marks
+///
+/// # Returns
+/// The Zhuyin string without tone marks
+///
+/// # Example
+/// ```
+/// use pinzh::strip_tone_from_zhuyin;
+///
+/// assert_eq!(strip_tone_from_zhuyin("ㄇㄚˇ"), "ㄇㄚ");
+/// assert_eq!(strip_tone_from_zhuyin("˙ㄇㄚ"), "ㄇㄚ");
+/// ```
+pub fn strip_tone_from_zhuyin(zhuyin: &str) -> String {
+    let mut result = zhuyin.to_string();
+
+    // Remove leading light tone mark
+    if result.starts_with('˙') {
+        result = result.chars().skip(1).collect();
+    }
+
+    // Remove trailing tone marks
+    if let Some(last) = result.chars().last() {
+        if matches!(last, 'ˊ' | 'ˇ' | 'ˋ') {
+            result.pop();
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -389,5 +585,109 @@ mod tests {
         assert_eq!(to_zhuyin("yang"), "ㄧㄤ");
         assert_eq!(to_zhuyin("yue"), "ㄩㄝ");
         assert_eq!(to_zhuyin("wei"), "ㄨㄟ");
+    }
+
+    #[test]
+    fn test_tone_from_number() {
+        assert_eq!(Tone::from_number(1), Some(Tone::Tone1));
+        assert_eq!(Tone::from_number(2), Some(Tone::Tone2));
+        assert_eq!(Tone::from_number(3), Some(Tone::Tone3));
+        assert_eq!(Tone::from_number(4), Some(Tone::Tone4));
+        assert_eq!(Tone::from_number(5), Some(Tone::Tone5));
+        assert_eq!(Tone::from_number(0), None);
+        assert_eq!(Tone::from_number(6), None);
+    }
+
+    #[test]
+    fn test_tone_to_number() {
+        assert_eq!(Tone::Tone1.to_number(), 1);
+        assert_eq!(Tone::Tone2.to_number(), 2);
+        assert_eq!(Tone::Tone3.to_number(), 3);
+        assert_eq!(Tone::Tone4.to_number(), 4);
+        assert_eq!(Tone::Tone5.to_number(), 5);
+    }
+
+    #[test]
+    fn test_tone_from_mark() {
+        assert_eq!(Tone::from_mark(""), Some(Tone::Tone1));
+        assert_eq!(Tone::from_mark("ˊ"), Some(Tone::Tone2));
+        assert_eq!(Tone::from_mark("ˇ"), Some(Tone::Tone3));
+        assert_eq!(Tone::from_mark("ˋ"), Some(Tone::Tone4));
+        assert_eq!(Tone::from_mark("˙"), Some(Tone::Tone5));
+        assert_eq!(Tone::from_mark("x"), None);
+    }
+
+    #[test]
+    fn test_tone_to_mark() {
+        assert_eq!(Tone::Tone1.to_mark(), "");
+        assert_eq!(Tone::Tone2.to_mark(), "ˊ");
+        assert_eq!(Tone::Tone3.to_mark(), "ˇ");
+        assert_eq!(Tone::Tone4.to_mark(), "ˋ");
+        assert_eq!(Tone::Tone5.to_mark(), "˙");
+    }
+
+    #[test]
+    fn test_tone_display() {
+        assert_eq!(format!("{}", Tone::Tone1), "");
+        assert_eq!(format!("{}", Tone::Tone2), "ˊ");
+        assert_eq!(format!("{}", Tone::Tone3), "ˇ");
+        assert_eq!(format!("{}", Tone::Tone4), "ˋ");
+        assert_eq!(format!("{}", Tone::Tone5), "˙");
+    }
+
+    #[test]
+    fn test_tone_roundtrip() {
+        for n in 1..=5 {
+            let tone = Tone::from_number(n).unwrap();
+            assert_eq!(tone.to_number(), n);
+        }
+        for tone in [Tone::Tone1, Tone::Tone2, Tone::Tone3, Tone::Tone4, Tone::Tone5] {
+            let mark = tone.to_mark();
+            assert_eq!(Tone::from_mark(mark), Some(tone));
+        }
+    }
+
+    #[test]
+    fn test_extract_tone() {
+        assert_eq!(extract_tone("ma1"), Some(Tone::Tone1));
+        assert_eq!(extract_tone("ma2"), Some(Tone::Tone2));
+        assert_eq!(extract_tone("ma3"), Some(Tone::Tone3));
+        assert_eq!(extract_tone("ma4"), Some(Tone::Tone4));
+        assert_eq!(extract_tone("ma5"), Some(Tone::Tone5));
+        assert_eq!(extract_tone("ma"), None);
+        assert_eq!(extract_tone("ni3hao3"), Some(Tone::Tone3)); // Gets last tone
+        assert_eq!(extract_tone(""), None);
+    }
+
+    #[test]
+    fn test_extract_tone_from_zhuyin() {
+        assert_eq!(extract_tone_from_zhuyin("ㄇㄚ"), Some(Tone::Tone1));
+        assert_eq!(extract_tone_from_zhuyin("ㄇㄚˊ"), Some(Tone::Tone2));
+        assert_eq!(extract_tone_from_zhuyin("ㄇㄚˇ"), Some(Tone::Tone3));
+        assert_eq!(extract_tone_from_zhuyin("ㄇㄚˋ"), Some(Tone::Tone4));
+        assert_eq!(extract_tone_from_zhuyin("˙ㄇㄚ"), Some(Tone::Tone5));
+        assert_eq!(extract_tone_from_zhuyin(""), None);
+    }
+
+    #[test]
+    fn test_strip_tone() {
+        assert_eq!(strip_tone("ma1"), "ma");
+        assert_eq!(strip_tone("ma2"), "ma");
+        assert_eq!(strip_tone("ma3"), "ma");
+        assert_eq!(strip_tone("ma4"), "ma");
+        assert_eq!(strip_tone("ma5"), "ma");
+        assert_eq!(strip_tone("ma"), "ma");
+        assert_eq!(strip_tone("ma6"), "ma6"); // 6 is not a valid tone
+        assert_eq!(strip_tone(""), "");
+    }
+
+    #[test]
+    fn test_strip_tone_from_zhuyin() {
+        assert_eq!(strip_tone_from_zhuyin("ㄇㄚ"), "ㄇㄚ");
+        assert_eq!(strip_tone_from_zhuyin("ㄇㄚˊ"), "ㄇㄚ");
+        assert_eq!(strip_tone_from_zhuyin("ㄇㄚˇ"), "ㄇㄚ");
+        assert_eq!(strip_tone_from_zhuyin("ㄇㄚˋ"), "ㄇㄚ");
+        assert_eq!(strip_tone_from_zhuyin("˙ㄇㄚ"), "ㄇㄚ");
+        assert_eq!(strip_tone_from_zhuyin(""), "");
     }
 }
